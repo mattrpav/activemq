@@ -30,6 +30,8 @@ import jakarta.jms.Connection;
 import jakarta.jms.InvalidSelectorException;
 import jakarta.jms.MessageProducer;
 import jakarta.jms.Session;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
@@ -53,6 +55,7 @@ import org.apache.activemq.command.Message;
 import org.apache.activemq.filter.BooleanExpression;
 import org.apache.activemq.filter.NonCachedMessageEvaluationContext;
 import org.apache.activemq.management.MessageFlowStats;
+import org.apache.activemq.management.UnsampledStatistic;
 import org.apache.activemq.selector.SelectorParser;
 import org.apache.activemq.store.MessageStore;
 import org.apache.activemq.util.URISupport;
@@ -633,55 +636,51 @@ public class DestinationView implements DestinationViewMBean {
 
     @Override
     public long getEnqueuedMessageBrokerInTime() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getEnqueuedMessageBrokerInTime().getValue() : 0l);
+        return getMessageFlowStat(MessageFlowStats::getEnqueuedMessageBrokerInTime, 0L);
     }
 
     @Override
     public String getEnqueuedMessageClientId() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getEnqueuedMessageClientID().getValue() : null);
+        return getMessageFlowStat(MessageFlowStats::getEnqueuedMessageClientID, null);
     }
 
     @Override
     public String getEnqueuedMessageId() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getEnqueuedMessageID().getValue() : null);
+        return getMessageFlowStat(MessageFlowStats::getEnqueuedMessageID, null);
     }
 
     @Override
     public long getEnqueuedMessageTimestamp() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getEnqueuedMessageTimestamp().getValue() : 0l);
+        return getMessageFlowStat(MessageFlowStats::getEnqueuedMessageTimestamp, 0L);
     }
 
     @Override
     public long getDequeuedMessageBrokerInTime() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getDequeuedMessageBrokerInTime().getValue() : 0l);
+        return getMessageFlowStat(MessageFlowStats::getDequeuedMessageBrokerInTime, 0L);
     }
 
     @Override
     public long getDequeuedMessageBrokerOutTime() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getDequeuedMessageBrokerOutTime().getValue() : 0l);
+        return getMessageFlowStat(MessageFlowStats::getDequeuedMessageBrokerOutTime, 0L);
     }
 
     @Override
     public String getDequeuedMessageClientId() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getDequeuedMessageClientID().getValue() : null);
+        return getMessageFlowStat(MessageFlowStats::getDequeuedMessageClientID, null);
     }
 
     @Override
     public String getDequeuedMessageId() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getDequeuedMessageID().getValue() : null);
+        return getMessageFlowStat(MessageFlowStats::getDequeuedMessageID, null);
     }
 
     @Override
     public long getDequeuedMessageTimestamp() {
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
-        return (tmpMessageFlowStats != null ? tmpMessageFlowStats.getDequeuedMessageTimestamp().getValue() : 0l);
+        return getMessageFlowStat(MessageFlowStats::getDequeuedMessageTimestamp, 0L);
+    }
+
+    private <T> T getMessageFlowStat(Function<MessageFlowStats, UnsampledStatistic<T>> f, T defVal) {
+        final var stats = destination.getDestinationStatistics().getMessageFlowStats();
+        return stats != null ? f.apply(stats).getValue() : defVal;
     }
 }

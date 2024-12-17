@@ -780,8 +780,8 @@ public class Topic extends BaseDestination implements Task {
         // destinationStatistics.getMessages().increment();
         destinationStatistics.getEnqueues().increment();
 
-        MessageFlowStats tmpMessageFlowStats = destinationStatistics.getMessageFlowStats();
-        if(isAdvancedMessageStatisticsEnabled() && tmpMessageFlowStats != null) {
+        final var tmpMessageFlowStats = destinationStatistics.getMessageFlowStats();
+        if(tmpMessageFlowStats != null) {
             tmpMessageFlowStats.enqueueStats(context.getClientId(), message.getMessageId().toString(), message.getTimestamp(), message.getBrokerInTime());
         }
 

@@ -1917,8 +1917,8 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
             destinationStatistics.getDequeues().increment();
             destinationStatistics.getMessages().decrement();
 
-            MessageFlowStats tmpMessageFlowStats = destinationStatistics.getMessageFlowStats();
-            if(isAdvancedMessageStatisticsEnabled() && tmpMessageFlowStats != null) {
+            final var tmpMessageFlowStats = destinationStatistics.getMessageFlowStats();
+            if(tmpMessageFlowStats != null) {
                 Message tmpMessage = reference.getMessage();
                 tmpMessageFlowStats.dequeueStats(context.getClientId(), tmpMessage.getMessageId().toString(), tmpMessage.getTimestamp(), tmpMessage.getBrokerInTime(), tmpMessage.getBrokerOutTime()); 
             }
@@ -1983,9 +1983,8 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
         destinationStatistics.getMessages().increment();
         destinationStatistics.getMessageSize().addSize(msg.getSize());
 
-        MessageFlowStats tmpMessageFlowStats = destinationStatistics.getMessageFlowStats();
-
-        if(isAdvancedMessageStatisticsEnabled() && tmpMessageFlowStats != null) {
+        final var tmpMessageFlowStats = destinationStatistics.getMessageFlowStats();
+        if(tmpMessageFlowStats != null) {
             tmpMessageFlowStats.enqueueStats(context.getClientId(), msg.getMessageId().toString(), msg.getTimestamp(), msg.getBrokerInTime());
         }
 

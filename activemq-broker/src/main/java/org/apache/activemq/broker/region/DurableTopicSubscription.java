@@ -376,8 +376,8 @@ public class DurableTopicSubscription extends PrefetchSubscription implements Us
                 ((Destination)node.getRegionDestination()).getDestinationStatistics().getNetworkDequeues().add(ack.getMessageCount());
             }
 
-            MessageFlowStats tmpMessageFlowStats = ((Destination)node.getRegionDestination()).getDestinationStatistics().getMessageFlowStats();
-            if(((Destination)node.getRegionDestination()).isAdvancedMessageStatisticsEnabled() && tmpMessageFlowStats != null) {
+            final MessageFlowStats tmpMessageFlowStats = ((Destination)node.getRegionDestination()).getDestinationStatistics().getMessageFlowStats();
+            if(tmpMessageFlowStats != null) {
                 tmpMessageFlowStats.dequeueStats(context.getClientId(), node.getMessageId().toString(), node.getMessage().getTimestamp(), node.getMessage().getBrokerInTime(), node.getMessage().getBrokerOutTime());
             }
         }

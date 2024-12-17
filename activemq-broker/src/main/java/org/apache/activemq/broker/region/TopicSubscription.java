@@ -455,8 +455,8 @@ public class TopicSubscription extends AbstractSubscription {
             }
         }
 
-        MessageFlowStats tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats(); 
-        if(destination.isAdvancedMessageStatisticsEnabled() && tmpMessageFlowStats != null) {
+        final var tmpMessageFlowStats = destination.getDestinationStatistics().getMessageFlowStats();
+        if(tmpMessageFlowStats != null) {
             tmpMessageFlowStats.dequeueStats(context.getClientId(), ack.getLastMessageId().toString());
         }
         if (ack.isExpiredAck()) {

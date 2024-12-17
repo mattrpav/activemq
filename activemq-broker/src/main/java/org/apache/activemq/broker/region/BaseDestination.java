@@ -111,7 +111,6 @@ public abstract class BaseDestination implements Destination {
     private boolean disposed = false;
     private boolean doOptimzeMessageStorage = true;
     private boolean advancedNetworkStatisticsEnabled = false;
-    private boolean advancedMessageStatisticsEnabled = false;
 
     /*
      * percentage of in-flight messages above which optimize message store is disabled
@@ -828,7 +827,7 @@ public abstract class BaseDestination implements Destination {
     @Override
     public void markForGC(long timeStamp) {
         if (isGcIfInactive() && this.lastActiveTime == 0 && isActive() == false
-                && destinationStatistics.messages.getCount() == 0 && getInactiveTimeoutBeforeGC() > 0l) {
+                && destinationStatistics.getMessages().getCount() == 0 && getInactiveTimeoutBeforeGC() > 0l) {
             this.lastActiveTime = timeStamp;
         }
     }
@@ -837,7 +836,7 @@ public abstract class BaseDestination implements Destination {
     public boolean canGC() {
         boolean result = false;
         final long currentLastActiveTime = this.lastActiveTime;
-        if (isGcIfInactive() && currentLastActiveTime != 0l && destinationStatistics.messages.getCount() == 0L ) {
+        if (isGcIfInactive() && currentLastActiveTime != 0l && destinationStatistics.getMessages().getCount() == 0L ) {
             if ((System.currentTimeMillis() - currentLastActiveTime) >= getInactiveTimeoutBeforeGC()) {
                 result = true;
             }
@@ -883,12 +882,11 @@ public abstract class BaseDestination implements Destination {
 
     @Override
     public boolean isAdvancedMessageStatisticsEnabled() {
-        return this.advancedMessageStatisticsEnabled;
+        return this.destinationStatistics.isAdvancedMessageStatisticsEnabled();
     }
 
     @Override
     public void setAdvancedMessageStatisticsEnabled(boolean advancedMessageStatisticsEnabled) {
-        this.advancedMessageStatisticsEnabled = advancedMessageStatisticsEnabled;
         this.destinationStatistics.setAdvancedMessageStatisticsEnabled(advancedMessageStatisticsEnabled);
     }
 
