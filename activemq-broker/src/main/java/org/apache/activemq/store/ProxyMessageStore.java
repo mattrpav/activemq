@@ -106,13 +106,23 @@ public class ProxyMessageStore implements MessageStore {
     }
 
     @Override
-    public void recoverNextMessages(int maxReturned, MessageRecoveryListener listener) throws Exception {
+    public void recoverNextMessages(final int maxReturned, final MessageRecoveryListener listener) throws Exception {
         delegate.recoverNextMessages(maxReturned, listener);
     }
 
     @Override
-    public void recoverNextMessages(int offset, int maxReturned, MessageRecoveryListener listener) throws Exception {
+    public void recoverNextMessages(final long offset, final int maxReturned, final MessageRecoveryListener listener) throws Exception {
         delegate.recoverNextMessages(offset, maxReturned, listener);
+    }
+
+    @Override
+    public void recoverNextMessages(final long offset, final int maxReturned, final MessageRecoveryListener listener, final boolean useDedicatedCursor) throws Exception {
+        delegate.recoverNextMessages(offset, maxReturned, listener, useDedicatedCursor);
+    }
+
+    @Override
+    public void recoverNextMessages(final String startMsgId, final String endMsgId, final int maxReturned, final MessageRecoveryListener listener, final boolean useDedicatedCursor) throws Exception {
+        delegate.recoverNextMessages(startMsgId, endMsgId, maxReturned, listener, useDedicatedCursor);
     }
 
     @Override

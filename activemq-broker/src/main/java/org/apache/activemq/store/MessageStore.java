@@ -178,7 +178,17 @@ public interface MessageStore extends Service {
 
     void recoverNextMessages(int maxReturned, MessageRecoveryListener listener) throws Exception;
 
-    void recoverNextMessages(int offset, int maxReturned, MessageRecoveryListener listener) throws Exception;
+    default void recoverNextMessages(long offset, int maxReturned, MessageRecoveryListener listener) throws Exception {
+        throw new UnsupportedOperationException("recoverNextMessages(offset,maxReturned,listener) is not supported");
+    }
+
+    default void recoverNextMessages(long offset, int maxReturned, MessageRecoveryListener listener, boolean useDedicatedCursor) throws Exception {
+        throw new UnsupportedOperationException("recoverNextMessages(offset,maxReturned,listener,useDedicatedCursor) is not supported");
+    }
+
+    default void recoverNextMessages(final String startMsgId, final String endMsgId, final int maxReturned, MessageRecoveryListener listener, final boolean useDedicatedCursor) throws Exception {
+        throw new UnsupportedOperationException("recoverNextMessages(startMsgId,endMsgId,maxReturned,listener,useDedicatedCursor) is not supported");
+    }
 
     void dispose(ConnectionContext context);
 
@@ -211,4 +221,5 @@ public interface MessageStore extends Service {
     void updateMessage(Message message) throws IOException;
 
     void registerIndexListener(IndexListener indexListener);
+
 }

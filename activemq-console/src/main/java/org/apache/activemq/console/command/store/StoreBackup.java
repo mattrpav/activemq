@@ -22,7 +22,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.activemq.broker.BrokerFactory;
 import org.apache.activemq.broker.BrokerService;
@@ -43,7 +46,7 @@ import org.apache.activemq.store.MessageStore;
 import org.apache.activemq.store.PersistenceAdapter;
 import org.apache.activemq.store.TopicMessageStore;
 import org.apache.activemq.store.TransactionRecoveryListener;
-import org.fusesource.hawtbuf.DataByteArrayOutputStream;
+import org.apache.activemq.store.kahadb.disk.util.DataByteArrayOutputStream;
 import org.apache.activemq.protobuf.AsciiBuffer;
 import org.apache.activemq.protobuf.Buffer;
 import org.apache.activemq.protobuf.UTF8Buffer;
@@ -62,6 +65,11 @@ public class StoreBackup {
     String queue;
     Integer offset;
     Integer count;
+    String indexes;
+    Collection<Integer> indexesList;
+
+    String startMsgId;
+    String endMsgId;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final AsciiBuffer ds_kind = new AsciiBuffer("ds");
@@ -86,6 +94,14 @@ public class StoreBackup {
 
         if (offset != null && count == null) {
             throw new Exception("optional --offset and --count must be specified together");
+        }
+
+        if ((startMsgId != null || endMsgId != null) && queue == null) {
+            throw new Exception("optional --queue must be specified when using startMsgId or endMsgId");
+        }
+
+        if (indexes != null && !indexes.isBlank()) {
+            indexesList = Stream.of(indexes.split(",")).map(index -> Integer.parseInt(index.trim())).collect(Collectors.toList());
         }
 
         setFile(new File(filename));
@@ -178,7 +194,19 @@ public class StoreBackup {
                         return true;
                     }
                 };
-                if(offset != null) {
+                if(startMsgId != null || endMsgId != null) {
+                    System.out.println("Backing up from startMsgId: " + startMsgId + " to endMsgId: " + endMsgId);
+                    queue.recoverNextMessages(startMsgId, endMsgId, (count != null ? count : Integer.MAX_VALUE), queueRecoveryListener, true);
+                } else if(indexesList != null) {
+                    System.out.println("Backing up using indexes count: " + indexesList.size());
+                    for(int idx : indexesList) {
+                        if(idx < 0) {
+                            continue;
+                        }
+                        queue.recoverNextMessages(idx, 1, queueRecoveryListener, true);
+                    }
+                } else if(offset != null) {
+                    System.out.println("Backing up from offset: " + offset + " count: " + count);
                     queue.recoverNextMessages(offset, count, queueRecoveryListener);
                 } else {
                     queue.recover(queueRecoveryListener);
@@ -265,14 +293,14 @@ public class StoreBackup {
     private MessagePB createMessagePB(Message message, long messageKey) throws IOException {
         DataByteArrayOutputStream mos = new DataByteArrayOutputStream();
         mos.writeBoolean(TIGHT_ENCODING);
-        mos.writeVarInt(OPENWIRE_VERSION);
+        mos.writeInt(OPENWIRE_VERSION);
         wireformat.marshal(message, mos);
 
         MessagePB messageRecord = new MessagePB();
         messageRecord.setCodec(codec_id);
         messageRecord.setMessageKey(messageKey);
         messageRecord.setSize(message.getSize());
-        messageRecord.setValue(new Buffer(mos.toBuffer().getData()));
+        messageRecord.setValue(new Buffer(mos.getData()));
         return messageRecord;
     }
 
@@ -322,5 +350,29 @@ public class StoreBackup {
 
     public Integer getCount() {
         return count;
+    }
+
+    public void setIndexes(String indexes) {
+        this.indexes = indexes;
+    }
+
+    public String getIndexes() {
+        return indexes;
+    }
+
+    public String getStartMsgId() {
+        return startMsgId;
+    }
+
+    public void setStartMsgId(String startMsgId) {
+        this.startMsgId = startMsgId;
+    }
+
+    public String getEndMsgId() {
+        return endMsgId;
+    }
+
+    public void setEndMsgId(String endMsgId) {
+        this.endMsgId = endMsgId;
     }
 }
