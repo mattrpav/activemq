@@ -16,20 +16,13 @@
  */
 package org.apache.activemq.spring.jetty;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -39,6 +32,8 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.eclipse.jetty.xml.XmlConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 
@@ -47,10 +42,23 @@ import org.springframework.beans.factory.InitializingBean;
  */
 public class JettyServerBean implements InitializingBean, DisposableBean {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JettyServerBean.class);
+
+    public static final String JETTY_PROPERTIES_DIRECTROY = "conf";
+    public static final String JETTY_PROPERTIES_FILE = "jetty.properties";
+    public static final String PROPERTY_XML_FILES = "jettyXmlFiles";
+    public static final String PROPERTY_HTTP_XML_FILES = "jettyHttpXmlFiles";
+    public static final String PROPERTY_HTTPS_XML_FILES = "jettyHttpsXmlFiles";
+    public static final String PROPERTY_EXTRA_XML_FILES = "jettyExtraXmlFiles";
+
+    public static final int PROPERTY_XML_FILES_LIMIT = 128;
+    public static final String PROPERTY_XML_FILES_SEPARATOR = ",";
+
     boolean httpEnabled = true;
     boolean httpsEnabled = false;
-    String jettyXmlDirectory = Path.of("conf", "jetty").toString();
-    String jettyConfDirectory = Path.of("conf").toString();
+    String jettyXmlDirectory = Path.of(JETTY_PROPERTIES_DIRECTROY, "jetty").toString();
+    String jettyConfDirectory = Path.of(JETTY_PROPERTIES_DIRECTROY).toString();
+    String jettyPropertiesFile = Path.of(JETTY_PROPERTIES_DIRECTROY, JETTY_PROPERTIES_FILE).toString();
     String webAppsContext = null;
 
     // List of configured IDs from XML;
@@ -61,7 +69,6 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
 
     private Server server;
 
-
     /**
      * Configure for the list of XML Resources and Properties.
      *
@@ -71,12 +78,11 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
      * @throws Exception if unable to create objects or read XML
      */
     public Map<String, Object> configure(List<Resource> xmls, Map<String, String> properties) throws Exception {
-        Map<String, Object> idMap = new HashMap<>();
+        var idMap = new HashMap<String, Object>();
 
         // Configure everything
-        for (Resource xmlResource : xmls)
-        {
-            XmlConfiguration configuration = new XmlConfiguration(xmlResource);
+        for (var xmlResource : xmls) {
+            var configuration = new XmlConfiguration(xmlResource);
             configuration.getIdMap().putAll(idMap);
             configuration.getProperties().putAll(properties);
             configuration.configure();
@@ -87,16 +93,15 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
     }
 
     private static void ensureDirExists(Path path) throws IOException {
-        if (!Files.exists(path))
-        {
+        if (!Files.exists(path)) {
             Files.createDirectories(path);
         }
     }
 
     private static Map<String, String> loadProperties(Resource resource) throws IOException {
-        Properties properties = new Properties();
+        var properties = new Properties();
 
-        try (InputStream in = resource.newInputStream()) {
+        try (var in = resource.newInputStream()) {
             properties.load(in);
         }
 
@@ -106,6 +111,24 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
                         e -> String.valueOf(e.getValue()),
                         (prev, next) -> next, HashMap::new
                 ));
+    }
+
+    private static List<String> resolveXmlFiles(String propertyName, String jettyXmlsCSV) {
+        if(jettyXmlsCSV == null ||
+           jettyXmlsCSV.isBlank() ||
+           jettyXmlsCSV.trim().isBlank()) {
+            return List.of();
+        }
+
+        if(jettyXmlsCSV.contains(PROPERTY_XML_FILES_SEPARATOR)) {
+            var splits = jettyXmlsCSV.split(PROPERTY_XML_FILES_SEPARATOR, PROPERTY_XML_FILES_LIMIT);
+            if(splits.length >= PROPERTY_XML_FILES_LIMIT) {
+                LOG.warn("Detected security exploit attempt or misconfiguration as maximum number files specified ({}) for property {}", PROPERTY_XML_FILES_LIMIT, propertyName);
+            }
+            return Arrays.stream(splits).map(String::trim).toList();
+        } else {
+            return List.of(jettyXmlsCSV.trim());
+        }
     }
 
     @Override
@@ -119,23 +142,35 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        try(ResourceFactory.Closeable resourceFactory = ResourceFactory.closeable())
-        {
-            Resource homeXmlResource = resourceFactory.newResource(Path.of(getJettyXmlDirectory()));
-            Resource customBaseResource = resourceFactory.newResource(Path.of(getJettyConfDirectory()));
 
-            xmls.add(homeXmlResource.resolve("jetty-bytebufferpool.xml"));
-            xmls.add(homeXmlResource.resolve("jetty-threadpool.xml"));
-            xmls.add(homeXmlResource.resolve("jetty.xml"));
+        try(var resourceFactory = ResourceFactory.closeable()) {
+            var homeXmlResource = resourceFactory.newResource(Path.of(getJettyXmlDirectory()));
+            var customBaseResource = resourceFactory.newResource(Path.of(getJettyConfDirectory()));
+            var jettyProperties = loadProperties(customBaseResource.resolve("jetty.properties"));
+
+            for(var jettyXmlFile : resolveXmlFiles(PROPERTY_XML_FILES, jettyProperties.get(PROPERTY_XML_FILES))) {
+                LOG.info("Loading jetty xml file: {}", jettyXmlFile);
+                xmls.add(homeXmlResource.resolve(jettyXmlFile));
+            }
+
             if (isHttpEnabled()) {
-                xmls.add(homeXmlResource.resolve("jetty-http.xml"));
+                for(var jettyHttpXmlFile : resolveXmlFiles(PROPERTY_HTTP_XML_FILES, jettyProperties.get(PROPERTY_HTTP_XML_FILES))) {
+                    LOG.info("Loading jetty http xml file: {}", jettyHttpXmlFile);
+                    xmls.add(homeXmlResource.resolve(jettyHttpXmlFile));
+                }
             }
             if (isHttpsEnabled()) {
-                xmls.add(homeXmlResource.resolve("jetty-ssl.xml"));
-                xmls.add(homeXmlResource.resolve("jetty-ssl-context.xml"));
-                xmls.add(homeXmlResource.resolve("jetty-https.xml"));
+                for(var jettyHttpsXmlFile : resolveXmlFiles(PROPERTY_HTTPS_XML_FILES, jettyProperties.get(PROPERTY_HTTPS_XML_FILES))) {
+                    LOG.info("Loading jetty https xml file: {}", jettyHttpsXmlFile);
+                    xmls.add(homeXmlResource.resolve(jettyHttpsXmlFile));
+                }
             }
-            // xmls.add(homeXmlResource.resolve("jetty-customrequestlog.xml"));
+
+            // example: jetty-customrequestlog.xml
+            for(var jettyExtraXmlFile : resolveXmlFiles(PROPERTY_EXTRA_XML_FILES, jettyProperties.get(PROPERTY_EXTRA_XML_FILES))) {
+                LOG.info("Loading jetty extra xml file: {}", jettyExtraXmlFile);
+                xmls.add(homeXmlResource.resolve(jettyExtraXmlFile));
+            }
 
             // Now we add our customizations
             // In this case, it's 2 ServletContextHandlers
@@ -145,11 +180,10 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
             }
 
             // Lets load our properties
-            Map<String, String> customProps = loadProperties(customBaseResource.resolve("jetty.properties"));
 
             // Create a path suitable for output / work directory / etc.
-            Path outputPath = Paths.get("target/xmlserver-output");
-            Path resourcesPath = outputPath.resolve("resources");
+            var outputPath = Paths.get("target/xmlserver-output");
+            var resourcesPath = outputPath.resolve("resources");
 
             ensureDirExists(outputPath);
             ensureDirExists(outputPath.resolve("logs"));
@@ -159,35 +193,38 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
 
             // And define some common properties
             // These 2 properties are used in MANY PLACES, define them, even if you don't use them fully.
-            customProps.put("jetty.home", outputPath.toString());
-            customProps.put("jetty.base", outputPath.toString());
+            jettyProperties.put("jetty.home", outputPath.toString());
+            jettyProperties.put("jetty.base", outputPath.toString());
             // And define the resource paths for the contexts
-            customProps.put("custom.resources", resourcesPath.toString());
-            customProps.put("jetty.sslContext.keyStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
-            customProps.put("jetty.sslContext.trustStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
+            jettyProperties.put("custom.resources", resourcesPath.toString());
+            jettyProperties.put("jetty.sslContext.keyStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
+            jettyProperties.put("jetty.sslContext.trustStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
 
             // Now lets tie it all together
-            idMap = configure(xmls, customProps);
+            idMap = configure(xmls, jettyProperties);
         }
 
         Server tmpServer = (Server)idMap.get("Server");
         tmpServer.start();
-        System.out.println("Server is running, and listening on ...");
-        for (ServerConnector connector : tmpServer.getBeans(ServerConnector.class))
+
+        var jettyServerOutput = new StringBuilder("Jetty Server listening on: ");
+        for (var connector : tmpServer.getBeans(ServerConnector.class))
         {
-            for (HttpConnectionFactory connectionFactory : connector.getBeans(HttpConnectionFactory.class))
+            for (var connectionFactory : connector.getBeans(HttpConnectionFactory.class))
             {
-                String scheme = "http";
-                HttpConfiguration httpConfiguration = connectionFactory.getHttpConfiguration();
+                var scheme = "http";
+                var httpConfiguration = connectionFactory.getHttpConfiguration();
                 if (httpConfiguration.getSecurePort() == connector.getLocalPort())
                     scheme = httpConfiguration.getSecureScheme();
-                String host = connector.getHost();
+                var host = connector.getHost();
                 if (host == null)
                     host = InetAddress.getLocalHost().getHostAddress();
-                System.out.printf("   %s://%s:%s/%n", scheme, host, connector.getLocalPort());
+
+                jettyServerOutput.append(String.format(" %s://%s:%s/%n", scheme, host, connector.getLocalPort()));
             }
         }
         tmpServer.join();
+        LOG.info(jettyServerOutput.toString());
         this.server = tmpServer;
     }
 
@@ -213,6 +250,14 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
 
     public String getJettyConfDirectory() {
         return jettyConfDirectory;
+    }
+
+    public void setJettyPropertiesfFile(String jettyPropertiesFile) {
+        this.jettyPropertiesFile = jettyPropertiesFile;
+    }
+
+    public String getJettyPropertiesFile() {
+        return jettyPropertiesFile;
     }
 
     public void setJettyXmlDirectory(String jettyXmlDirectory) {
