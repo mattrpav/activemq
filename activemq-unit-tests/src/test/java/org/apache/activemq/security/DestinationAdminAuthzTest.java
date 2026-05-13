@@ -37,7 +37,6 @@ import org.apache.activemq.command.ActiveMQTempTopic;
 import org.apache.activemq.command.ActiveMQTopic;
 import org.apache.activemq.filter.DestinationMap;
 import org.apache.activemq.jaas.GroupPrincipal;
-import org.apache.activemq.test.annotations.ParallelTest;
 import org.apache.activemq.util.Wait;
 import org.junit.After;
 import org.junit.Before;
@@ -56,7 +55,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-@Category(ParallelTest.class)
 @RunWith(value = Parameterized.class)
 public class DestinationAdminAuthzTest {
 
@@ -79,7 +77,7 @@ public class DestinationAdminAuthzTest {
     static {
         try {
             WILDCARD = (Principal) DefaultAuthorizationMap.createGroupPrincipal(
-                    SecurityContext.WILDCARD, GroupPrincipal.class.getName());
+                    "*", GroupPrincipal.class.getName());
         } catch (Exception e) {
             LOG.error("Failed to make wildcard principal", e);
         }
