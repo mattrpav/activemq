@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.activemq.broker.SslContext;
 import org.apache.activemq.transport.Transport;
 import org.apache.activemq.transport.TransportFactory;
 import org.apache.activemq.transport.TransportLoggerFactory;
@@ -87,9 +88,22 @@ public class HttpTransportFactory extends TransportFactory {
         return new HttpClientTransport(textWireFormat, uri);
     }
 
+    /**
+     * HTTP has no client SslContext (that is HttpsTransportFactory's job), so this
+     * SSL-aware createTransport override ignores the context and builds the plain
+     * HTTP transport. It is required because TcpTransportFactory implements the 3-arg
+     * createTransport by building a TcpTransport directly (it does not route back
+     * through the 2-arg), so without it the connect template would bypass
+     * the HttpClientTransport builder above.
+     */
+    @Override
+    protected Transport createTransport(URI location, WireFormat wf, SslContext sslContext) throws IOException {
+        return createTransport(location, wf);
+    }
+
     @Override
     @SuppressWarnings("rawtypes")
-    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) throws Exception {
+    public Transport serverConfigure(Transport transport, WireFormat format, HashMap options) {
         return compositeConfigure(transport, format, options);
     }
 
