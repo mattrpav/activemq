@@ -2001,7 +2001,13 @@ public class Queue extends BaseDestination implements Task, UsageListener, Index
                 messagesLock.writeLock().unlock();
             }
         } catch (IOException e) {
-            LOG.error("Failed to remove expired Message from the store ", e);
+            // The expiry CAS (canProcessAsExpired) was consumed by the caller and
+            // dropMessage has not run: without a reset the failed expiry would
+            // never be retried and the messages counter would stay inflated while
+            // the row remains orphaned in the store. Reset so a later expiry
+            // check can process this message again.
+            reference.getMessage().resetProcessAsExpired();
+            LOG.error("Failed to remove expired message {} from the store, expiry processing will be retried", reference.getMessageId(), e);
         }
     }
 
