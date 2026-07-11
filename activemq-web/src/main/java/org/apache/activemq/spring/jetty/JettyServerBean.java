@@ -19,9 +19,7 @@ package org.apache.activemq.spring.jetty;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -38,7 +36,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 
 /**
- * Demonstration of using the XmlConfiguration to build up a server with multiple XML files and Properties.
+ * Using Jetty XmlConfiguration to build up a server with multiple XML files and Properties.
  */
 public class JettyServerBean implements InitializingBean, DisposableBean {
 
@@ -92,45 +90,6 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
         return idMap;
     }
 
-    private static void ensureDirExists(Path path) throws IOException {
-        if (!Files.exists(path)) {
-            Files.createDirectories(path);
-        }
-    }
-
-    private static Map<String, String> loadProperties(Resource resource) throws IOException {
-        var properties = new Properties();
-
-        try (var in = resource.newInputStream()) {
-            properties.load(in);
-        }
-
-        return properties.entrySet().stream().collect(
-                Collectors.toMap(
-                        e -> String.valueOf(e.getKey()),
-                        e -> String.valueOf(e.getValue()),
-                        (prev, next) -> next, HashMap::new
-                ));
-    }
-
-    private static List<String> resolveXmlFiles(String propertyName, String jettyXmlsCSV) {
-        if(jettyXmlsCSV == null ||
-           jettyXmlsCSV.isBlank() ||
-           jettyXmlsCSV.trim().isBlank()) {
-            return List.of();
-        }
-
-        if(jettyXmlsCSV.contains(PROPERTY_XML_FILES_SEPARATOR)) {
-            var splits = jettyXmlsCSV.split(PROPERTY_XML_FILES_SEPARATOR, PROPERTY_XML_FILES_LIMIT);
-            if(splits.length >= PROPERTY_XML_FILES_LIMIT) {
-                LOG.warn("Detected security exploit attempt or misconfiguration as maximum number files specified ({}) for property {}", PROPERTY_XML_FILES_LIMIT, propertyName);
-            }
-            return Arrays.stream(splits).map(String::trim).toList();
-        } else {
-            return List.of(jettyXmlsCSV.trim());
-        }
-    }
-
     @Override
     public void destroy() throws Exception {
         // TODO: review if we need to check
@@ -149,26 +108,29 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
             var jettyProperties = loadProperties(customBaseResource.resolve(JETTY_PROPERTIES_FILE));
 
             for(var jettyXmlFile : resolveXmlFiles(PROPERTY_XML_FILES, jettyProperties.get(PROPERTY_XML_FILES))) {
-                LOG.info("Loading jetty xml file: {}", jettyXmlFile);
+                LOG.debug("Loading jetty xml file: {}", jettyXmlFile);
                 xmls.add(homeXmlResource.resolve(jettyXmlFile));
             }
 
             if (isHttpEnabled()) {
                 for(var jettyHttpXmlFile : resolveXmlFiles(PROPERTY_HTTP_XML_FILES, jettyProperties.get(PROPERTY_HTTP_XML_FILES))) {
-                    LOG.info("Loading jetty http xml file: {}", jettyHttpXmlFile);
+                    LOG.debug("Loading jetty http xml file: {}", jettyHttpXmlFile);
                     xmls.add(homeXmlResource.resolve(jettyHttpXmlFile));
                 }
             }
             if (isHttpsEnabled()) {
+                // Only needed when the HTTPS xml files are loaded.
+                jettyProperties.put("jetty.sslContext.keyStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
+                jettyProperties.put("jetty.sslContext.trustStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
                 for(var jettyHttpsXmlFile : resolveXmlFiles(PROPERTY_HTTPS_XML_FILES, jettyProperties.get(PROPERTY_HTTPS_XML_FILES))) {
-                    LOG.info("Loading jetty https xml file: {}", jettyHttpsXmlFile);
+                    LOG.debug("Loading jetty https xml file: {}", jettyHttpsXmlFile);
                     xmls.add(homeXmlResource.resolve(jettyHttpsXmlFile));
                 }
             }
 
             // example: jetty-customrequestlog.xml
             for(var jettyExtraXmlFile : resolveXmlFiles(PROPERTY_EXTRA_XML_FILES, jettyProperties.get(PROPERTY_EXTRA_XML_FILES))) {
-                LOG.info("Loading jetty extra xml file: {}", jettyExtraXmlFile);
+                LOG.debug("Loading jetty extra xml file: {}", jettyExtraXmlFile);
                 xmls.add(homeXmlResource.resolve(jettyExtraXmlFile));
             }
 
@@ -179,26 +141,18 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
                 xmls.add(homeXmlResource.resolve(getWebAppsContext()));
             }
 
-            // Lets load our properties
-
-            // Create a path suitable for output / work directory / etc.
-            var outputPath = Paths.get("target/xmlserver-output");
-            var resourcesPath = outputPath.resolve("resources");
-
-            ensureDirExists(outputPath);
-            ensureDirExists(outputPath.resolve("logs"));
-            ensureDirExists(resourcesPath);
-            ensureDirExists(resourcesPath.resolve("bar"));
-            ensureDirExists(resourcesPath.resolve("foo"));
-
-            // And define some common properties
-            // These 2 properties are used in MANY PLACES, define them, even if you don't use them fully.
-            jettyProperties.put("jetty.home", outputPath.toString());
-            jettyProperties.put("jetty.base", outputPath.toString());
-            // And define the resource paths for the contexts
-            jettyProperties.put("custom.resources", resourcesPath.toString());
-            jettyProperties.put("jetty.sslContext.keyStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
-            jettyProperties.put("jetty.sslContext.trustStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
+            // Expose the ActiveMQ install location so the jetty xml files can resolve
+            // web application base resources absolutely (e.g. ${activemq.home}/webapps/admin)
+            // rather than relative to the process working directory. Any of these may be
+            // overridden via jetty-spring.properties (putIfAbsent respects a supplied value),
+            // which is how tests point them at a target/ location.
+            jettyProperties.putIfAbsent("activemq.home", System.getProperty("activemq.home", "."));
+            jettyProperties.putIfAbsent("activemq.base", System.getProperty("activemq.base",
+                    jettyProperties.get("activemq.home")));
+            // Default the standard Jetty home/base to the ActiveMQ install so things like the
+            // request log resolve under the distribution rather than the working directory.
+            jettyProperties.putIfAbsent("jetty.home", jettyProperties.get("activemq.home"));
+            jettyProperties.putIfAbsent("jetty.base", jettyProperties.get("activemq.base"));
 
             // Now lets tie it all together
             idMap = configure(xmls, jettyProperties);
@@ -284,5 +238,38 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
      */
     public Server getServer() {
         return server;
+    }
+
+    private static Map<String, String> loadProperties(Resource resource) throws IOException {
+        var properties = new Properties();
+
+        try (var in = resource.newInputStream()) {
+            properties.load(in);
+        }
+
+        return properties.entrySet().stream().collect(
+                Collectors.toMap(
+                        e -> String.valueOf(e.getKey()),
+                        e -> String.valueOf(e.getValue()),
+                        (prev, next) -> next, HashMap::new
+                ));
+    }
+
+    private static List<String> resolveXmlFiles(String propertyName, String jettyXmlsCSV) {
+        if(jettyXmlsCSV == null ||
+                jettyXmlsCSV.isBlank() ||
+                jettyXmlsCSV.trim().isBlank()) {
+            return List.of();
+        }
+
+        if(jettyXmlsCSV.contains(PROPERTY_XML_FILES_SEPARATOR)) {
+            var splits = jettyXmlsCSV.split(PROPERTY_XML_FILES_SEPARATOR, PROPERTY_XML_FILES_LIMIT);
+            if(splits.length > PROPERTY_XML_FILES_LIMIT) {
+                LOG.warn("Detected security exploit attempt or misconfiguration as maximum number files specified ({}) for property {}", PROPERTY_XML_FILES_LIMIT, propertyName);
+            }
+            return Arrays.stream(splits).map(String::trim).toList();
+        } else {
+            return List.of(jettyXmlsCSV.trim());
+        }
     }
 }

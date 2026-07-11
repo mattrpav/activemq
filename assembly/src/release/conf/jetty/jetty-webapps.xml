@@ -120,8 +120,14 @@
     <Arg>
       <New class="org.eclipse.jetty.ee9.webapp.WebAppContext">
         <Set name="contextPath">/admin</Set>
-        <Set name="baseResourceAsString">webapps/admin</Set>
+        <Set name="baseResourceAsString"><Property name="activemq.home" default="."/>/webapps/admin</Set>
         <Set name="logUrlOnStart">true</Set>
+        <!-- Scan the container JSP/JSTL jars so the Jasper ServletContainerInitializer
+             runs and TLDs are discovered (otherwise JSP compilation fails with a null TldCache). -->
+        <Call name="setAttribute">
+          <Arg>org.eclipse.jetty.server.webapp.ContainerIncludeJarPattern</Arg>
+          <Arg>.*/jetty-ee9-[^/]*\.jar$|.*/jetty-jakarta-servlet-api-[^/]*\.jar$|.*/jakarta\.servlet\.jsp\.jstl.*\.jar$</Arg>
+        </Call>
       </New>
     </Arg>
   </Call>
@@ -131,8 +137,14 @@
     <Arg>
       <New class="org.eclipse.jetty.ee9.webapp.WebAppContext">
         <Set name="contextPath">/api</Set>
-        <Set name="baseResourceAsString">webapps/api</Set>
+        <Set name="baseResourceAsString"><Property name="activemq.home" default="."/>/webapps/api</Set>
         <Set name="logUrlOnStart">true</Set>
+        <!-- Scan the container JSP/JSTL jars so the Jasper ServletContainerInitializer
+             runs and TLDs are discovered (otherwise JSP compilation fails with a null TldCache). -->
+        <Call name="setAttribute">
+          <Arg>org.eclipse.jetty.server.webapp.ContainerIncludeJarPattern</Arg>
+          <Arg>.*/jetty-ee9-[^/]*\.jar$|.*/jetty-jakarta-servlet-api-[^/]*\.jar$|.*/jakarta\.servlet\.jsp\.jstl.*\.jar$</Arg>
+        </Call>
       </New>
     </Arg>
   </Call>
@@ -147,7 +159,7 @@
             <Item>index.html</Item>
           </Array>
         </Set>
-        <Set name="baseResourceAsString">webapps/</Set>
+        <Set name="baseResourceAsString"><Property name="activemq.home" default="."/>/webapps/</Set>
       </New>
     </Arg>
   </Call>
