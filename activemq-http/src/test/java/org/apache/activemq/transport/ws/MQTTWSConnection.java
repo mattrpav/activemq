@@ -182,16 +182,23 @@ public class MQTTWSConnection extends AbstractAutoDemanding implements Session.L
     @Override
     public void onWebSocketBinary(ByteBuffer payload, Callback callback) {
         if (payload == null || !payload.hasRemaining()) {
+            callback.succeed();
             return;
         }
 
-        MQTTFrame frame = null;
+        MQTTFrame frame;
 
         try {
-            frame = (MQTTFrame)wireFormat.unmarshal(new ByteSequence(payload.array()));
+            // Copy exactly the remaining bytes: the payload is a view into a pooled
+            // buffer, so payload.array() would expose the wrong region / trailing garbage.
+            byte[] data = new byte[payload.remaining()];
+            payload.get(data);
+            frame = (MQTTFrame)wireFormat.unmarshal(new ByteSequence(data));
         } catch (IOException e) {
             LOG.error("Could not decode incoming MQTT Frame: {}", e.getMessage());
+            callback.fail(e);
             getSession().close();
+            return;
         }
 
         try {
@@ -243,8 +250,12 @@ public class MQTTWSConnection extends AbstractAutoDemanding implements Session.L
                 LOG.error("Unknown MQTT  Frame received.");
                 getSession().close();
             }
+            // AutoDemanding: complete the callback so the next frame is demanded and
+            // the pooled payload buffer is released.
+            callback.succeed();
         } catch (Exception e) {
             LOG.error("Could not decode incoming MQTT Frame: {}", e.getMessage());
+            callback.fail(e);
             getSession().close();
         }
     }
