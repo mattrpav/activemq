@@ -57,7 +57,8 @@
       <Set name="requestHeaderSize" property="jetty.httpConfig.requestHeaderSize"/>
       <Set name="responseHeaderSize" property="jetty.httpConfig.responseHeaderSize"/>
       <Set name="maxResponseHeaderSize"><Property name="jetty.httpConfig.maxResponseHeaderSize" default="16384"/></Set>
-      <Set name="sendServerVersion" property="jetty.httpConfig.sendServerVersion"/>
+      <Set name="sendServerVersion"><Property name="jetty.httpConfig.sendServerVersion" default="false"/></Set>
+      <Set name="sendXPoweredBy"><Property name="jetty.httpConfig.sendXPoweredBy" default="false"/></Set>
       <Set name="sendDateHeader"><Property name="jetty.httpConfig.sendDateHeader" default="false"/></Set>
       <Set name="headerCacheSize" property="jetty.httpConfig.headerCacheSize"/>
       <Set name="delayDispatchUntilContent" property="jetty.httpConfig.delayDispatchUntilContent"/>

@@ -53,6 +53,42 @@
             </New>
           </Arg>
         </Call>
+        <Call name="addRule">
+          <Arg>
+            <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+              <Set name="pattern">*</Set>
+              <Set name="headerName">Referrer-Policy</Set>
+              <Set name="headerValue">no-referrer</Set>
+            </New>
+          </Arg>
+        </Call>
+        <Call name="addRule">
+          <Arg>
+            <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+              <Set name="pattern">*</Set>
+              <Set name="headerName">Permissions-Policy</Set>
+              <Set name="headerValue">accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()</Set>
+            </New>
+          </Arg>
+        </Call>
+        <Call name="addRule">
+          <Arg>
+            <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+              <Set name="pattern">*</Set>
+              <Set name="headerName">Cross-Origin-Opener-Policy</Set>
+              <Set name="headerValue">same-origin</Set>
+            </New>
+          </Arg>
+        </Call>
+        <Call name="addRule">
+          <Arg>
+            <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+              <Set name="pattern">*</Set>
+              <Set name="headerName">Cross-Origin-Resource-Policy</Set>
+              <Set name="headerValue">same-origin</Set>
+            </New>
+          </Arg>
+        </Call>
         <!-- Relaxed CSP rules for XML admin pages -->
         <Call name="addRule">
           <Arg>
@@ -63,6 +99,18 @@
             </New>
           </Arg>
         </Call>
+        <!-- Uncomment when serving the console over HTTPS only -->
+        <!--
+        <Call name="addRule">
+          <Arg>
+            <New class="org.eclipse.jetty.rewrite.handler.HeaderPatternRule">
+              <Set name="pattern">*</Set>
+              <Set name="headerName">Strict-Transport-Security</Set>
+              <Set name="headerValue">max-age=31536000; includeSubDomains</Set>
+            </New>
+          </Arg>
+        </Call>
+        -->
       </New>
     </Arg>
   </Call>

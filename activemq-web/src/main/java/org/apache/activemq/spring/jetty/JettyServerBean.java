@@ -45,7 +45,7 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
     private static final Logger LOG = LoggerFactory.getLogger(JettyServerBean.class);
 
     public static final String JETTY_PROPERTIES_DIRECTROY = "conf";
-    public static final String JETTY_PROPERTIES_FILE = "jetty.properties";
+    public static final String JETTY_PROPERTIES_FILE = "jetty-spring.properties";
     public static final String PROPERTY_XML_FILES = "jettyXmlFiles";
     public static final String PROPERTY_HTTP_XML_FILES = "jettyHttpXmlFiles";
     public static final String PROPERTY_HTTPS_XML_FILES = "jettyHttpsXmlFiles";
@@ -146,7 +146,7 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
         try(var resourceFactory = ResourceFactory.closeable()) {
             var homeXmlResource = resourceFactory.newResource(Path.of(getJettyXmlDirectory()));
             var customBaseResource = resourceFactory.newResource(Path.of(getJettyConfDirectory()));
-            var jettyProperties = loadProperties(customBaseResource.resolve("jetty.properties"));
+            var jettyProperties = loadProperties(customBaseResource.resolve(JETTY_PROPERTIES_FILE));
 
             for(var jettyXmlFile : resolveXmlFiles(PROPERTY_XML_FILES, jettyProperties.get(PROPERTY_XML_FILES))) {
                 LOG.info("Loading jetty xml file: {}", jettyXmlFile);
@@ -223,8 +223,10 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
                 jettyServerOutput.append(String.format(" %s://%s:%s/%n", scheme, host, connector.getLocalPort()));
             }
         }
-        tmpServer.join();
         LOG.info(jettyServerOutput.toString());
+        // NOTE: do not call tmpServer.join() here - this is an embedded server
+        // started from a Spring init method; joining would block the calling
+        // thread until the server stops and leave this.server unassigned.
         this.server = tmpServer;
     }
 
@@ -274,5 +276,13 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
 
     public String getWebAppsContext() {
         return webAppsContext;
+    }
+
+    /**
+     * @return the started Jetty {@link Server}, or {@code null} if this bean has
+     *         not yet been initialized.
+     */
+    public Server getServer() {
+        return server;
     }
 }
