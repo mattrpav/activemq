@@ -72,7 +72,7 @@
     <Arg>
       <New class="org.eclipse.jetty.ee9.webapp.WebAppContext">
         <Set name="contextPath">/admin</Set>
-        <Set name="baseResourceAsString">webapps/admin</Set>
+        <Set name="baseResourceAsString">src/test/resources/webapps/admin</Set>
         <Set name="logUrlOnStart">true</Set>
       </New>
     </Arg>
@@ -83,7 +83,7 @@
     <Arg>
       <New class="org.eclipse.jetty.ee9.webapp.WebAppContext">
         <Set name="contextPath">/api</Set>
-        <Set name="baseResourceAsString">webapps/api</Set>
+        <Set name="baseResourceAsString">src/test/resources/webapps/api</Set>
         <Set name="logUrlOnStart">true</Set>
       </New>
     </Arg>
@@ -99,7 +99,7 @@
             <Item>index.html</Item>
           </Array>
         </Set>
-        <Set name="baseResourceAsString">webapps/</Set>
+        <Set name="baseResourceAsString">src/test/resources/webapps/</Set>
       </New>
     </Arg>
   </Call>
