@@ -125,10 +125,10 @@ abstract public class WebTransportServerSupport extends TransportServerSupport {
         mapping.setPathSpec("/");
         securityHandler.addConstraintMapping(mapping);
 
-        constraint = new Constraint();
-        constraint.setName("allow");
+        servletConstraint = new ServletConstraint();
+        servletConstraint.setName("allow");
         mapping = new ConstraintMapping();
-        mapping.setConstraint(constraint);
+        mapping.setConstraint(servletConstraint);
         mapping.setMethodOmissions(new String[]{ "TRACE" });
         mapping.setPathSpec("/");
         securityHandler.addConstraintMapping(mapping);
