@@ -47,6 +47,8 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
     public static final String PROPERTY_XML_FILES = "jettyXmlFiles";
     public static final String PROPERTY_HTTP_XML_FILES = "jettyHttpXmlFiles";
     public static final String PROPERTY_HTTPS_XML_FILES = "jettyHttpsXmlFiles";
+    public static final String PROPERTY_HTTP_ENABLED = "httpEnabled";
+    public static final String PROPERTY_HTTPS_ENABLED = "httpsEnabled";
     public static final String PROPERTY_EXTRA_XML_FILES = "jettyExtraXmlFiles";
 
     public static final int PROPERTY_XML_FILES_LIMIT = 128;
@@ -107,6 +109,11 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
             var customBaseResource = resourceFactory.newResource(Path.of(getJettyConfDirectory()));
             var jettyProperties = loadProperties(customBaseResource.resolve(JETTY_PROPERTIES_FILE));
 
+            // http/https enablement is driven from jetty-spring.properties (httpEnabled/httpsEnabled),
+            // falling back to the bean's configured value when the property is absent.
+            setHttpEnabled(Boolean.parseBoolean(jettyProperties.getOrDefault(PROPERTY_HTTP_ENABLED, String.valueOf(isHttpEnabled()))));
+            setHttpsEnabled(Boolean.parseBoolean(jettyProperties.getOrDefault(PROPERTY_HTTPS_ENABLED, String.valueOf(isHttpsEnabled()))));
+
             for(var jettyXmlFile : resolveXmlFiles(PROPERTY_XML_FILES, jettyProperties.get(PROPERTY_XML_FILES))) {
                 LOG.debug("Loading jetty xml file: {}", jettyXmlFile);
                 xmls.add(homeXmlResource.resolve(jettyXmlFile));
@@ -119,9 +126,9 @@ public class JettyServerBean implements InitializingBean, DisposableBean {
                 }
             }
             if (isHttpsEnabled()) {
-                // Only needed when the HTTPS xml files are loaded.
-                jettyProperties.put("jetty.sslContext.keyStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
-                jettyProperties.put("jetty.sslContext.trustStoreAbsolutePath", customBaseResource.resolve("keystore").toString());
+                // The keystore/truststore location and password come from jetty-spring.properties
+                // (canonical jetty.sslContext.keyStorePath / keyStorePassword, resolved against
+                // jetty.base), which jetty-ssl-context.xml reads directly.
                 for(var jettyHttpsXmlFile : resolveXmlFiles(PROPERTY_HTTPS_XML_FILES, jettyProperties.get(PROPERTY_HTTPS_XML_FILES))) {
                     LOG.debug("Loading jetty https xml file: {}", jettyHttpsXmlFile);
                     xmls.add(homeXmlResource.resolve(jettyHttpsXmlFile));
