@@ -40,7 +40,7 @@ import org.junit.Test;
 /**
  * Validates the console's HTTPS connector: JettyServerBean loads the canonical
  * jetty-ssl.xml / jetty-ssl-context.xml / jetty-https.xml against the sample
- * broker.ks keystore, and an actual TLS request to /admin/ is challenged for
+ * jetty-keystore.ks keystore, and an actual TLS request to /admin/ is challenged for
  * authentication (proving the TLS handshake and JAAS SecurityHandler both work
  * over HTTPS).
  */
@@ -65,7 +65,7 @@ public class JettyServerBeanSslTest {
             int port = connector.getLocalPort();
 
             // Trust-all SSL context: we are validating the server's TLS + auth wiring, not the
-            // (self-signed, dev-only) broker.ks certificate. A raw SSLSocket avoids client-side
+            // (self-signed, dev-only) jetty-keystore.ks certificate. A raw SSLSocket avoids client-side
             // hostname verification against 127.0.0.1.
             SSLContext ssl = SSLContext.getInstance("TLS");
             ssl.init(null, new TrustManager[] { new X509TrustManager() {
