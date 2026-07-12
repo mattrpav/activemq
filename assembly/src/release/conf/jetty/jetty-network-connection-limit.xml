@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0"?>
 <!--
     Licensed to the Apache Software Foundation (ASF) under one or more
     contributor license agreements.  See the NOTICE file distributed with
@@ -15,8 +15,19 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 -->
-<!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "https://www.eclipse.org/jetty/configure_12_0.dtd">
-<Configure class="org.eclipse.jetty.ee9.webapp.WebAppContext">
-  <Set name="contextPath">/console</Set>
-  <Set name="resourceBase">webapps/admin</Set>
+<!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "https://jetty.org/configure_10_0.dtd">
+<Configure id="Server" class="org.eclipse.jetty.server.Server">
+  <Call name="addBean">
+    <Arg>
+      <New class="org.eclipse.jetty.server.NetworkConnectionLimit">
+        <Arg name= "maxNetworkConnectionCount" type="int">
+          <Property name="jetty.networkConnectionLimit.maxNetworkConnectionCount" default="1000" />
+        </Arg>
+        <Arg name="server">
+          <Ref refid="Server" />
+        </Arg>
+        <Set name="endPointIdleTimeout"><Property name="jetty.networkConnectionLimit.endPointIdleTimeout" default="1000" /></Set>
+      </New>
+    </Arg>
+  </Call>
 </Configure>
