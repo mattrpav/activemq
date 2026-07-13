@@ -111,13 +111,13 @@ abstract public class WebTransportServerSupport extends TransportServerSupport {
     protected void configureTraceMethod(ConstraintSecurityHandler securityHandler,
             boolean enableTrace) {
 
-        ServletConstraint servletConstraint;
-        //If enableTrace is true, then we want to set authenticate to false to allow it
-        if(enableTrace) {
-            servletConstraint = new ServletConstraint("trace-security", ServletConstraint.ANY_AUTH);
-        } else {
-            servletConstraint = new ServletConstraint("trace-security", ServletConstraint.ANY_ROLE);
-        }
+        ServletConstraint servletConstraint = new ServletConstraint();
+        servletConstraint.setName("trace-security");
+        // If enableTrace is true we set authenticate=false so TRACE is permitted; otherwise
+        // authenticate=true forces authentication which - with no login service configured on this
+        // handler - forbids TRACE (403). Using the (name, role) constructor instead leaves
+        // authenticate=false, so the constraint would enforce nothing and TRACE would always pass.
+        servletConstraint.setAuthenticate(!enableTrace);
 
         ConstraintMapping mapping = new ConstraintMapping();
         mapping.setConstraint(servletConstraint);
