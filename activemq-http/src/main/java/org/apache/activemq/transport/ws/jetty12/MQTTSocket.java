@@ -26,8 +26,8 @@ import org.apache.activemq.transport.mqtt.MQTTCodec;
 import org.apache.activemq.transport.ws.AbstractMQTTSocket;
 import org.apache.activemq.util.ByteSequence;
 import org.apache.activemq.util.IOExceptionSupport;
-import org.eclipse.jetty.ee9.websocket.api.WebSocketListener;
-import org.eclipse.jetty.ee9.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.Callback;
+import org.eclipse.jetty.websocket.api.Session;
 import org.fusesource.hawtbuf.Buffer;
 import org.fusesource.hawtbuf.DataByteArrayInputStream;
 import org.fusesource.mqtt.codec.DISCONNECT;
@@ -35,7 +35,7 @@ import org.fusesource.mqtt.codec.MQTTFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFrameSink, WebSocketListener {
+public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFrameSink, Session.Listener.AutoDemanding {
 
     private static final Logger LOG = LoggerFactory.getLogger(MQTTSocket.class);
 
@@ -57,7 +57,7 @@ public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFram
         try {
             //timeout after a period of time so we don't wait forever and hold the protocol lock
             // FIXME: convert to async .get(getDefaultSendTimeOut(), TimeUnit.SECONDS)
-            session.getRemote().sendBytes(ByteBuffer.wrap(bytes.getData(), 0, bytes.getLength()));
+            session.sendBinary(ByteBuffer.wrap(bytes.getData(), 0, bytes.getLength()), null);
         } catch (Exception e) {
             throw IOExceptionSupport.create(e);
         }
@@ -73,7 +73,7 @@ public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFram
     //----- WebSocket.OnTextMessage callback handlers ------------------------//
 
     @Override
-    public void onWebSocketBinary(byte[] bytes, int offset, int length) {
+    public void onWebSocketBinary(ByteBuffer payload, Callback callback) {
         if (!transportStartedAtLeastOnce()) {
             LOG.debug("Waiting for MQTTSocket to be properly started...");
             try {
@@ -85,8 +85,10 @@ public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFram
 
         protocolLock.lock();
         try {
-            receiveCounter += length;
-            codec.parse(new DataByteArrayInputStream(new Buffer(bytes, offset, length)), length);
+            receiveCounter += payload.remaining();
+            byte[] data = new byte[payload.remaining()];
+            payload.get(data);
+            codec.parse(new DataByteArrayInputStream(data), data.length);
         } catch (Exception e) {
             onException(IOExceptionSupport.create(e));
         } finally {
@@ -95,10 +97,10 @@ public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFram
     }
 
     @Override
-    public void onWebSocketClose(int arg0, String arg1) {
+    public void onWebSocketClose(int statusCode, String reason, Callback callback) {
         try {
             if (protocolLock.tryLock() || protocolLock.tryLock(ORDERLY_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
-                LOG.debug("MQTT WebSocket closed: code[{}] message[{}]", arg0, arg1);
+                LOG.debug("MQTT WebSocket closed: code[{}] message[{}]", statusCode, reason);
                 //Check if we received a disconnect packet before closing
                 if (!receivedDisconnect.get()) {
                     getProtocolConverter().onTransportError();
@@ -115,13 +117,14 @@ public class MQTTSocket extends AbstractMQTTSocket implements MQTTCodec.MQTTFram
     }
 
     @Override
-    public void onWebSocketConnect(Session session) {
+    public void onWebSocketOpen(Session session) {
         this.session = session;
         this.session.setIdleTimeout(Duration.ZERO);
     }
 
     @Override
     public void onWebSocketError(Throwable arg0) {
+
 
     }
 

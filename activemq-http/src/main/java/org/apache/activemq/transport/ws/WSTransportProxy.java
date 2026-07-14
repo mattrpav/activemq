@@ -34,8 +34,8 @@ import org.apache.activemq.util.IOExceptionSupport;
 import org.apache.activemq.util.IntrospectionSupport;
 import org.apache.activemq.util.ServiceStopper;
 import org.apache.activemq.wireformat.WireFormat;
-import org.eclipse.jetty.ee9.websocket.api.Session;
-import org.eclipse.jetty.ee9.websocket.api.WebSocketListener;
+import org.eclipse.jetty.websocket.api.Callback;
+import org.eclipse.jetty.websocket.api.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * A proxy class that manages sending WebSocket events to the wrapped protocol level
  * WebSocket Transport.
  */
-public final class WSTransportProxy extends TransportSupport implements Transport, WebSocketListener, BrokerServiceAware, WSTransportSink {
+public final class WSTransportProxy extends TransportSupport implements Transport, Session.Listener.AutoDemanding, BrokerServiceAware, WSTransportSink {
 
     private static final Logger LOG = LoggerFactory.getLogger(WSTransportProxy.class);
 
@@ -159,7 +159,7 @@ public final class WSTransportProxy extends TransportSupport implements Transpor
     //----- WebSocket methods being proxied to the WS Transport --------------//
 
     @Override
-    public void onWebSocketBinary(byte[] payload, int offset, int length) {
+    public void onWebSocketBinary(ByteBuffer payload, Callback callback) {
         if (!transportStartedAtLeastOnce()) {
             LOG.debug("Waiting for WebSocket to be properly started...");
             try {
@@ -171,7 +171,7 @@ public final class WSTransportProxy extends TransportSupport implements Transpor
 
         protocolLock.lock();
         try {
-            wsTransport.onWebSocketBinary(ByteBuffer.wrap(payload, offset, length));
+            wsTransport.onWebSocketBinary(payload);
         } catch (Exception e) {
             onException(IOExceptionSupport.create(e));
         } finally {
@@ -201,7 +201,7 @@ public final class WSTransportProxy extends TransportSupport implements Transpor
     }
 
     @Override
-    public void onWebSocketClose(int statusCode, String reason) {
+    public void onWebSocketClose(int statusCode, String reason, Callback callbac) {
         try {
             if (protocolLock.tryLock() || protocolLock.tryLock(ORDERLY_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
                 LOG.debug("WebSocket closed: code[{}] message[{}]", statusCode, reason);
@@ -217,7 +217,7 @@ public final class WSTransportProxy extends TransportSupport implements Transpor
     }
 
     @Override
-    public void onWebSocketConnect(Session session) {
+    public void onWebSocketOpen(Session session) {
         this.session = session;
         this.session.setIdleTimeout(Duration.ZERO);
 
@@ -248,7 +248,7 @@ public final class WSTransportProxy extends TransportSupport implements Transpor
             // FIXME: Convert to async API w/ tiemeout getDefaultSendTimeOut(), TimeUnit.SECONDS);
             // Outbound text must be sent as a WebSocket TEXT frame (sendString), not a binary
             // frame; sendString also encodes as UTF-8 per the WebSocket spec.
-            session.getRemote().sendString(data);
+            session.sendText(data, null);
         } catch (Exception e) {
             throw IOExceptionSupport.create(e);
         }
@@ -269,7 +269,7 @@ public final class WSTransportProxy extends TransportSupport implements Transpor
         int limit = data.limit();
         try {
             // FIXME: Convert to async API w/ tiemeout getDefaultSendTimeOut(), TimeUnit.SECONDS);
-            session.getRemote().sendBytes(data);
+            session.sendBinary(data, null);
         } catch (Exception e) {
             throw IOExceptionSupport.create(e);
         }

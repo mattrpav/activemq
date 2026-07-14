@@ -23,9 +23,10 @@ import java.util.Map;
 
 import org.apache.activemq.util.InetAddressUtil;
 import org.apache.activemq.util.IntrospectionSupport;
-import org.eclipse.jetty.ee9.nested.ServletConstraint;
-import org.eclipse.jetty.ee9.security.ConstraintMapping;
-import org.eclipse.jetty.ee9.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.ee11.servlet.security.ConstraintMapping;
+import org.eclipse.jetty.ee11.servlet.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.security.Constraint;
+import org.eclipse.jetty.security.Constraint.Authorization;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.resource.ResourceFactory;
@@ -109,24 +110,21 @@ abstract public class WebTransportServerSupport extends TransportServerSupport {
     }
 
     protected void configureTraceMethod(ConstraintSecurityHandler securityHandler,
-            boolean enableTrace) {
+                                        boolean enableTrace) {
 
-        ServletConstraint servletConstraint = new ServletConstraint();
-        servletConstraint.setName("trace-security");
         // If enableTrace is true we set authenticate=false so TRACE is permitted; otherwise
         // authenticate=true forces authentication which - with no login service configured on this
         // handler - forbids TRACE (403). Using the (name, role) constructor instead leaves
         // authenticate=false, so the constraint would enforce nothing and TRACE would always pass.
-        servletConstraint.setAuthenticate(!enableTrace);
-
+        Constraint.Authorization traceAuth = enableTrace ? Authorization.ALLOWED : Authorization.FORBIDDEN;
+        Constraint servletConstraint = Constraint.from("trace-security", traceAuth);
         ConstraintMapping mapping = new ConstraintMapping();
         mapping.setConstraint(servletConstraint);
         mapping.setMethod("TRACE");
         mapping.setPathSpec("/");
         securityHandler.addConstraintMapping(mapping);
 
-        servletConstraint = new ServletConstraint();
-        servletConstraint.setName("allow");
+        servletConstraint = Constraint.from("allow", Authorization.ALLOWED);
         mapping = new ConstraintMapping();
         mapping.setConstraint(servletConstraint);
         mapping.setMethodOmissions(new String[]{ "TRACE" });
