@@ -27,10 +27,10 @@ import static org.mockito.Mockito.when;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import jakarta.websocket.RemoteEndpoint;
 import org.apache.activemq.transport.Transport;
 import org.apache.activemq.transport.TransportListener;
-import org.eclipse.jetty.ee9.websocket.api.RemoteEndpoint;
-import org.eclipse.jetty.ee9.websocket.api.Session;
+import org.eclipse.jetty.websocket.api.Session;
 import org.junit.Test;
 
 /**
@@ -47,7 +47,7 @@ public class WSTransportProxyTest {
         WSTransportProxy proxy = new WSTransportProxy("ws://localhost:61614", transport);
         proxy.setTransportListener(mock(TransportListener.class));
         proxy.start();                     // counts down the "started" latch so sends don't block
-        proxy.onWebSocketConnect(session); // installs the session used by the outbound sends
+        proxy.onWebSocketOpen(session); // installs the session used by the outbound sends
         return proxy;
     }
 
@@ -55,24 +55,20 @@ public class WSTransportProxyTest {
     public void testOutboundTextIsSentAsTextFrame() throws Exception {
         WSTransport wsTransport = mock(WSTransport.class);
         Session session = mock(Session.class);
-        RemoteEndpoint remote = mock(RemoteEndpoint.class);
-        when(session.getRemote()).thenReturn(remote);
 
         WSTransportProxy proxy = startedProxy(wsTransport, session);
 
         proxy.onSocketOutboundText("CONNECTED\n");
 
         // Must be a WebSocket TEXT frame (sendString), never a binary frame.
-        verify(remote, times(1)).sendString("CONNECTED\n");
-        verify(remote, never()).sendBytes(any(ByteBuffer.class));
+        verify(session, times(1)).sendText("CONNECTED\n", null);
+        verify(session, never()).sendBinary(any(ByteBuffer.class), null);
     }
 
     @Test
     public void testOutboundBinaryIsSentAsBinaryFrame() throws Exception {
         WSTransport wsTransport = mock(WSTransport.class);
         Session session = mock(Session.class);
-        RemoteEndpoint remote = mock(RemoteEndpoint.class);
-        when(session.getRemote()).thenReturn(remote);
 
         WSTransportProxy proxy = startedProxy(wsTransport, session);
 
@@ -80,7 +76,7 @@ public class WSTransportProxyTest {
         proxy.onSocketOutboundBinary(payload);
 
         // Must be a WebSocket BINARY frame (sendBytes), never a text frame.
-        verify(remote, times(1)).sendBytes(any(ByteBuffer.class));
-        verify(remote, never()).sendString(anyString());
+        verify(session, times(1)).sendBinary(any(ByteBuffer.class), null);
+        verify(session, never()).sendText(anyString(), null);
     }
 }

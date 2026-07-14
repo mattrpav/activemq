@@ -25,6 +25,7 @@ import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -41,8 +42,10 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.io.ClientConnector;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.util.resource.PathResource;
+import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.ee9.webapp.WebAppContext;
+import org.eclipse.jetty.ee11.webapp.WebAppContext;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -73,8 +76,9 @@ public class WSTransportTest extends WSTransportTestSupport {
 
         Connector connector = createJettyConnector(server);
 
+        ResourceFactory factory = ResourceFactory.of(server);
         WebAppContext context = new WebAppContext();
-        context.setResourceBase("src/test/webapp");
+        context.setBaseResource(factory.newResource("src/test/webapp"));
         context.setContextPath("/");
         context.setServer(server);
 
