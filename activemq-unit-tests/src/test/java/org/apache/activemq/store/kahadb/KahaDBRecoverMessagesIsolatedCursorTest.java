@@ -51,21 +51,21 @@ import org.junit.experimental.categories.Category;
 import org.junit.rules.TestName;
 
 /**
- * Proves that recoverMessages(MessageRecoveryContext) with a dedicated cursor
+ * Proves that recoverMessages(MessageRecoveryContext) with a isolated cursor
  * is fully isolated from the destination's live cursor state.
  *
  * The MessageOrderIterator records the last visited sequence keys
  * (lastDefaultKey/lastHighKey/lastLowKey) on the shared MessageOrderIndex.
- * Before the fix, a dedicated-cursor visit also wrote those bookmarks, and
+ * Before the fix, a isolated-cursor visit also wrote those bookmarks, and
  * the next zero-entry live batch (recoverNextMessages) committed them into
  * the destination cursor via stoppedIterating() — rewinding the cursor
  * (duplicates from store) or jumping it forward (missed messages).
  *
- * Also proves that a dedicated-cursor vsite does not consume rolled-back
+ * Also proves that a isolated-cursor vsite does not consume rolled-back
  * transactional acks that the live cursor must redeliver.
  */
 @Category(ParallelTest.class)
-public class KahaDBRecoverMessagesDedicatedCursorTest {
+public class KahaDBRecoverMessagesIsolatedCursorTest {
 
     protected BrokerService brokerService = null;
     private KahaDBStore kahaDBStore = null;
@@ -111,7 +111,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
     private KahaDBStore createStore(boolean delete) throws Exception {
         var kaha = new KahaDBStore();
         kaha.setJournalMaxFileLength(1024 * 100);
-        kaha.setDirectory(new File(IOHelper.getDefaultDataDirectory(), "kahadb-dedicated-cursor-tests"));
+        kaha.setDirectory(new File(IOHelper.getDefaultDataDirectory(), "kahadb-isolated-cursor-tests"));
         if (delete) {
             kaha.deleteAllMessages();
         }
@@ -119,13 +119,13 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
     }
 
     /**
-     * A dedicated-cursor visit between two live batches must not leave state
+     * A isolated-cursor visit between two live batches must not leave state
      * behind that a later zero-entry live batch commits into the destination
      * cursor. Before the fix the final recoverNextMessages() re-delivered the
      * tail of the queue (duplicates from store).
      */
     @Test
-    public void testDedicatedCursorVisitDoesNotCorruptLiveCursor() throws Exception {
+    public void testIsolatedCursorVisitDoesNotCorruptLiveCursor() throws Exception {
         var queueName = testName.getMethodName();
         sendMessages(10, queueName);
         var messageStore = kahaDBStore.createQueueMessageStore(new ActiveMQQueue(queueName));
@@ -135,7 +135,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         messageStore.recoverNextMessages(10, liveBatch1);
         assertEquals(10, liveBatch1.getRecoveredMessages().size());
 
-        // dedicated-cursor visit from the head of the store (messages are
+        // isolated-cursor visit from the head of the store (messages are
         // still in the index — dispatched but unacked)
         var visit = new TestMessageRecoveryListener();
         messageStore.recoverMessages(new MessageRecoveryContext.Builder()
@@ -156,18 +156,18 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         // the 5 messages beyond the visit window ("duplicate from store").
         var liveBatch3 = new TestMessageRecoveryListener();
         messageStore.recoverNextMessages(10, liveBatch3);
-        assertEquals("live cursor re-delivered store messages after a dedicated-cursor visit",
+        assertEquals("live cursor re-delivered store messages after a isolated-cursor visit",
                 0, liveBatch3.getRecoveredMessages().size());
     }
 
     /**
-     * A dedicated-cursor visit ahead of the live cursor must not cause the
+     * A isolated-cursor visit ahead of the live cursor must not cause the
      * live cursor to skip messages. Before the fix the visit bookmark was
      * committed by a zero-entry live batch, jumping the cursor past messages
      * that were never dispatched (stuck queue).
      */
     @Test
-    public void testDedicatedCursorVisitDoesNotSkipLiveMessages() throws Exception {
+    public void testIsolatedCursorVisitDoesNotSkipLiveMessages() throws Exception {
         var queueName = testName.getMethodName();
         sendMessages(10, queueName);
         var messageStore = kahaDBStore.createQueueMessageStore(new ActiveMQQueue(queueName));
@@ -177,7 +177,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         messageStore.recoverNextMessages(2, liveBatch1);
         assertEquals(2, liveBatch1.getRecoveredMessages().size());
 
-        // dedicated-cursor visit across the whole store — reads sequences
+        // isolated-cursor visit across the whole store — reads sequences
         // ahead of the live cursor
         var visit = new TestMessageRecoveryListener();
         messageStore.recoverMessages(new MessageRecoveryContext.Builder()
@@ -193,12 +193,12 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         // skipping messages 3..10 entirely.
         var liveBatch2 = new TestMessageRecoveryListener();
         messageStore.recoverNextMessages(10, liveBatch2);
-        assertEquals("live cursor skipped messages after a dedicated-cursor visit",
+        assertEquals("live cursor skipped messages after a isolated-cursor visit",
                 8, liveBatch2.getRecoveredMessages().size());
     }
 
     /**
-     * Shared-cursor mode (useDedicatedCursor=false) intentionally advances
+     * Shared-cursor mode (useIsolatedCursor=false) intentionally advances
      * the destination cursor — successive calls continue where the previous
      * one stopped. This documents the contract and guards it from regressing.
      */
@@ -211,7 +211,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         var firstPage = new TestMessageRecoveryListener();
         messageStore.recoverMessages(new MessageRecoveryContext.Builder()
                 .messageRecoveryListener(firstPage)
-                .useDedicatedCursor(false)
+                .useIsolatedCursor(false)
                 .maxMessageCountReturned(5)
                 .build());
         assertEquals(5, firstPage.getRecoveredMessages().size());
@@ -220,7 +220,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         var secondPage = new TestMessageRecoveryListener();
         messageStore.recoverMessages(new MessageRecoveryContext.Builder()
                 .messageRecoveryListener(secondPage)
-                .useDedicatedCursor(false)
+                .useIsolatedCursor(false)
                 .maxMessageCountReturned(5)
                 .build());
         assertEquals(5, secondPage.getRecoveredMessages().size());
@@ -234,13 +234,13 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
 
     /**
      * Rolled-back transactional acks are queued for redelivery through the
-     * live cursor. A dedicated-cursor visit must not consume them: before
+     * live cursor. A isolated-cursor visit must not consume them: before
      * the fix the visit both received the rolled-back message (duplicating
      * it in its own scan results) and permanently removed it from the
      * redelivery map, so the live cursor never redelivered it.
      */
     @Test
-    public void testDedicatedCursorVisitDoesNotConsumeRolledBackAcks() throws Exception {
+    public void testIsolatedCursorVisitDoesNotConsumeRolledBackAcks() throws Exception {
         var queueName = testName.getMethodName();
         sendMessages(3, queueName);
         var messageStore = kahaDBStore.createQueueMessageStore(new ActiveMQQueue(queueName));
@@ -262,7 +262,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
         kahaMessageStore.trackRecoveredAcks(acks);
         kahaMessageStore.forgetRecoveredAcks(acks, true);
 
-        // dedicated-cursor visit: must see exactly the 3 messages in the
+        // isolated-cursor visit: must see exactly the 3 messages in the
         // index — no rolled-back-ack replay mixed into visit results
         var visit = new TestMessageRecoveryListener();
         messageStore.recoverMessages(new MessageRecoveryContext.Builder()
@@ -270,7 +270,7 @@ public class KahaDBRecoverMessagesDedicatedCursorTest {
                 .offset(0L)
                 .maxMessageCountReturned(10)
                 .build());
-        assertEquals("dedicated-cursor visit consumed rolled-back ack redeliveries",
+        assertEquals("isolated-cursor visit consumed rolled-back ack redeliveries",
                 3, visit.getRecoveredMessages().size());
 
         // the live cursor must still redeliver the rolled-back message

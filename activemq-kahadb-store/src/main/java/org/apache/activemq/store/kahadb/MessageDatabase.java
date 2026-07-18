@@ -3848,12 +3848,34 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
             }
         }
 
+        /**
+         * Iterate and record the last visited sequence keys
+         * (lastDefaultKey/lastHighKey/lastLowKey) so that a subsequent
+         * {@link #stoppedIterating()} advances the destination cursor past the
+         * visited messages.
+         */
         Iterator<Entry<Long, MessageKeys>> iterator(Transaction tx) throws IOException{
-            return new MessageOrderIterator(tx,cursor,this);
+            return new MessageOrderIterator(tx,cursor,this,true);
         }
 
         Iterator<Entry<Long, MessageKeys>> iterator(Transaction tx, MessageOrderCursor m) throws IOException{
-            return new MessageOrderIterator(tx,m,this);
+            return new MessageOrderIterator(tx,m,this,true);
+        }
+
+        /**
+         * Read-only iteration that never records the lastDefaultKey/lastHighKey/lastLowKey
+         * bookmarks. Browses, statistics scans and other iterations that are not committed
+         * with {@link #stoppedIterating()} must use this variant — otherwise a later
+         * zero-entry batch iteration would commit the bookmarks left behind here into the
+         * destination cursor, rewinding it (duplicates from store) or jumping it forward
+         * (missed messages).
+         */
+        Iterator<Entry<Long, MessageKeys>> isolatedIterator(Transaction tx) throws IOException{
+            return new MessageOrderIterator(tx,cursor,this,false);
+        }
+
+        Iterator<Entry<Long, MessageKeys>> isolatedIterator(Transaction tx, MessageOrderCursor m) throws IOException{
+            return new MessageOrderIterator(tx,m,this,false);
         }
 
         public byte lastGetPriority() {
@@ -3893,8 +3915,12 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
             final Iterator<Entry<Long, MessageKeys>>highIterator;
             final Iterator<Entry<Long, MessageKeys>>defaultIterator;
             final Iterator<Entry<Long, MessageKeys>>lowIterator;
+            // when false, next() leaves the shared lastDefaultKey/lastHighKey/lastLowKey
+            // bookmarks untouched so this iteration cannot affect the destination cursor
+            final boolean trackLastKeys;
 
-            MessageOrderIterator(Transaction tx, MessageOrderCursor m, MessageOrderIndex messageOrderIndex) throws IOException {
+            MessageOrderIterator(Transaction tx, MessageOrderCursor m, MessageOrderIndex messageOrderIndex, boolean trackLastKeys) throws IOException {
+                this.trackLastKeys = trackLastKeys;
                 Long pendingAddLimiter = messageOrderIndex.minPendingAdd();
                 this.defaultIterator = defaultPriorityIndex.iterator(tx, m.defaultCursorPosition, pendingAddLimiter);
                 if (highPriorityIndex != null) {
@@ -3961,7 +3987,7 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
             @Override
             public Entry<Long, MessageKeys> next() {
                 Entry<Long, MessageKeys> result = currentIterator.next();
-                if (result != null) {
+                if (result != null && trackLastKeys) {
                     Long key = result.getKey();
                     if (highIterator != null) {
                         if (currentIterator == defaultIterator) {
