@@ -657,7 +657,7 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                     StoredDestination sd = getStoredDestination(dest, tx);
                     recoverRolledBackAcks(destination.getPhysicalName(), sd, tx, Integer.MAX_VALUE, listener);
                     for (Iterator<Entry<Long, MessageKeys>> iterator =
-                            new IsolatedMessageOrderIterator(tx, new MessageOrderCursor(), sd.orderIndex); listener.hasSpace() &&
+                            sd.orderIndex.isolatedIterator(tx); listener.hasSpace() &&
                             iterator.hasNext(); ) {
                         Entry<Long, MessageKeys> entry = iterator.next();
                         Set<String> ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());
@@ -787,7 +787,7 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                     // bookmarks are recorded on the shared order index — a later zero-entry live batch
                     // would otherwise commit them via stoppedIterating() and corrupt the destination cursor.
                     Iterator<Entry<Long, MessageKeys>> iterator = (messageRecoveryContext.isUseIsolatedCursor() ?
-                            new IsolatedMessageOrderIterator(tx, new MessageOrderCursor(startSequenceOffset), sd.orderIndex) :
+                            sd.orderIndex.isolatedIterator(tx, new MessageOrderCursor(startSequenceOffset)) :
                             sd.orderIndex.iterator(tx));
 
                     while (iterator.hasNext()) {
@@ -1322,7 +1322,7 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                         // hit the max browse limit, or if the listener returns false for hasSpace()
                         final Set<Long> uniqueExpired = new HashSet<>();
                         for (Iterator<Entry<Long, MessageKeys>> iterator =
-                            new IsolatedMessageOrderIterator(tx, new MessageOrderCursor(), sd.orderIndex); count < maxBrowse && iterator.hasNext() && listener.hasSpace(); ) {
+                            sd.orderIndex.isolatedIterator(tx); count < maxBrowse && iterator.hasNext() && listener.hasSpace(); ) {
                             count++;
                             Entry<Long, MessageKeys> entry = iterator.next();
                             Set<String> ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());

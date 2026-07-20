@@ -3862,6 +3862,15 @@ public abstract class MessageDatabase extends ServiceSupport implements BrokerSe
             return new MessageOrderIterator(tx,m,this);
         }
 
+        Iterator<Entry<Long, MessageKeys>> isolatedIterator(Transaction tx) throws IOException{
+            return isolatedIterator(tx, new MessageOrderCursor());
+        }
+
+        Iterator<Entry<Long, MessageKeys>> isolatedIterator(Transaction tx, MessageOrderCursor m) throws IOException{
+            return new IsolatedMessageOrderIterator(tx, m, this);
+        }
+
+
         public byte lastGetPriority() {
             return lastGetPriority;
         }
