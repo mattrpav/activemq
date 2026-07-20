@@ -784,11 +784,12 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                         recoverRolledBackAcks(destination.getPhysicalName(), sd, tx, messageRecoveryContext.getMaxMessageCountReturned(), messageRecoveryContext);
                     }
                     Set<String> ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());
-                    // [AMQ-9773] An isolated cursor iterates with isolatedIterator so no lastXxxKey
+                    // [AMQ-9773] An isolated cursor uses IsolatedMessageOrderIterator so no lastXxxKey
                     // bookmarks are recorded on the shared order index — a later zero-entry live batch
                     // would otherwise commit them via stoppedIterating() and corrupt the destination cursor.
-                    Iterator<Entry<Long, MessageKeys>> iterator = (messageRecoveryContext.isUseIsolatedCursor() ? sd.orderIndex.isolatedIterator(tx,
-                            new MessageOrderCursor(startSequenceOffset)) : sd.orderIndex.iterator(tx));
+                    Iterator<Entry<Long, MessageKeys>> iterator = (messageRecoveryContext.isUseIsolatedCursor() ?
+                            new IsolatedMessageOrderIterator(tx, new MessageOrderCursor(startSequenceOffset), sd.orderIndex) :
+                            sd.orderIndex.iterator(tx));
 
                     while (iterator.hasNext()) {
                         entry = iterator.next();
