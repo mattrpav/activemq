@@ -656,9 +656,8 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                 pageFile.tx().execute(tx -> {
                     StoredDestination sd = getStoredDestination(dest, tx);
                     recoverRolledBackAcks(destination.getPhysicalName(), sd, tx, Integer.MAX_VALUE, listener);
-                    sd.orderIndex.resetCursorPosition();
                     for (Iterator<Entry<Long, MessageKeys>> iterator =
-                            sd.orderIndex.iterator(tx, new MessageOrderCursor()); listener.hasSpace() &&
+                            new IsolatedMessageOrderIterator(tx, new MessageOrderCursor(), sd.orderIndex); listener.hasSpace() &&
                             iterator.hasNext(); ) {
                         Entry<Long, MessageKeys> entry = iterator.next();
                         Set<String> ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());
@@ -1307,7 +1306,6 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
             try {
                 return pageFile.tx().execute(tx -> {
                         StoredDestination sd = getStoredDestination(dest, tx);
-                        sd.orderIndex.resetCursorPosition();
                         int count = 0;
                         final Map<SubscriptionKey, List<Message>> expired = new HashMap<>();
                         final Map<String, SubscriptionKey> subKeys = new HashMap<>();
@@ -1324,7 +1322,7 @@ public class KahaDBStore extends MessageDatabase implements PersistenceAdapter, 
                         // hit the max browse limit, or if the listener returns false for hasSpace()
                         final Set<Long> uniqueExpired = new HashSet<>();
                         for (Iterator<Entry<Long, MessageKeys>> iterator =
-                            sd.orderIndex.iterator(tx, new MessageOrderCursor()); count < maxBrowse && iterator.hasNext() && listener.hasSpace(); ) {
+                            new IsolatedMessageOrderIterator(tx, new MessageOrderCursor(), sd.orderIndex); count < maxBrowse && iterator.hasNext() && listener.hasSpace(); ) {
                             count++;
                             Entry<Long, MessageKeys> entry = iterator.next();
                             Set<String> ackedAndPrepared = ackedAndPreparedMap.get(destination.getPhysicalName());
