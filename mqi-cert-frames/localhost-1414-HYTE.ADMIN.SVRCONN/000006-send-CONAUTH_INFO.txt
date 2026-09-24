@@ -1,0 +1,19 @@
+Frame #6
+Timestamp:    2026-06-27T23:25:41.556-05:00
+Direction:    send
+TSH Type:     TSHC
+Segment Type: CONAUTH_INFO (10)
+Segment Len:  76
+Byte Order:   LITTLE_ENDIAN
+CtlFlag1:     0x30
+Encoding:     546
+CCSID:        1208
+Conv ID:      1
+Request ID:   0
+Payload Len:  40
+
+Payload Hex (first 256 bytes):
+  0000: 43 41 55 54 01 00 00 00 08 00 00 00 08 00 00 00  |CAUT............|
+  0010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
+  0020: 00 00 00 00 00 00 00 00                          |........        |
+

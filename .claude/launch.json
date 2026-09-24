@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "java",
+      "runtimeArgs": ["-Dhyte.project.root=/Users/mattrpav/git/rspond/oss/hyte-mq", "-jar", "/Users/mattrpav/git/rspond/oss/hyte-mq/certification/certification-dashboard/target/certification-dashboard.jar"],
+      "port": 8090,
+      "autoPort": false
+    }
+  ]
+}
