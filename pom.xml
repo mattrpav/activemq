@@ -197,11 +197,15 @@
       <url>${staging.siteURL}/maven/${project.version}</url>
       <!--<url>${site-repo-url}</url>-->
     </site>
+    <repository>
+      <id>repo.hyte.io</id>
+      <name>HYTE Release Repository</name>
+      <url>https://repo.hyte.io/maven/repository/releases/</url>
+    </repository>
     <snapshotRepository>
-      <id>apache.snapshots.https</id>
-      <name>Apache Development Snapshot Repository</name>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-      <uniqueVersion>false</uniqueVersion>
+      <id>repo.hyte.io</id>
+      <name>HYTE Snapshot Repository</name>
+      <url>https://repo.hyte.io/maven/repository/snapshots/</url>
     </snapshotRepository>
   </distributionManagement>
 
